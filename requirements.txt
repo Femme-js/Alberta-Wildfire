@@ -1,0 +1,8 @@
+Flask==3.0.0
+pyngrok==7.1.2
+dash
+keplergl
+shutil
+pandas
+json
+numpy
