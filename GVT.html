@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Visualizations</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        /* Add some basic styling */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000000; /* Set background color */
+	    color: #fff;
+
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: flex-start;
+            padding: 20px;
+        }
+        .chart {
+            position: relative;
+            width: 45%; /* Adjust as needed */
+            height: 400px; /* Adjust as needed */
+            margin: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .chart-title {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #origin-selector {
+            margin: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        #fire-origin-selector {
+            margin: 10px 0;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Dropdown title -->
+    <h2 style="text-align: center; color: #ffffff;">Select Fire Origin:</h2>
+
+    <!-- Dropdown for selecting fire origin -->
+    <div id="origin-selector">
+        <select id="origin-dropdown">
+            <!-- Options will be populated dynamically -->
+        </select>
+    </div>
+
+    <!-- Container for the charts -->
+    <div class="container">
+        <div id="wind-direction-vs-speed" class="chart">
+            <div class="chart-title">Wind Direction vs. Wind Speed</div>
+        </div>
+        <div id="industry-pie-chart" class="chart">
+            <div class="chart-title">Industry Pie Chart</div>
+        </div>
+        <div id="activity-class-pie-chart" class="chart">
+            <div class="chart-title">Activity Class Pie Chart</div>
+        </div>
+        <div id="fire-origin-bar-chart" class="chart">
+            <div class="chart-title">Fire Origin Bar Chart</div>
+        </div>
+        <div id="line-chart-container" class="chart">
+            <div class="chart-title">Line Chart: Weather Conditions Over Time</div>
+            <div id="fire-origin-selector">
+                <h3>Weather Conditions Based on Fire Origin:</h3>
+                <select id="fire-origin-select" onchange="updateLineChart()">
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            <div id="line-chart"></div>
+        </div>
+    </div>
+
+    <script>
+        var data; // Declare data variable globally
+
+        // Load the data
+        d3.csv('filtered_data.csv').then(function(csvData) {
+            data = csvData; // Assign loaded data to the global variable
+
+            // Extract unique fire years
+            var years = Array.from(new Set(data.map(d => d.fire_year)));
+
+            // Populate the dropdown with fire years
+            var dropdown = d3.select("#origin-dropdown");
+            dropdown.selectAll("option")
+                .data(years)
+                .enter().append("option")
+                .text(d => d)
+                .attr("value", d => d);
+
+            // Function to generate random RGB color
+            function getRandomColor() {
+                var r = Math.floor(Math.random() * 256);
+                var g = Math.floor(Math.random() * 256);
+                var b = Math.floor(Math.random() * 256);
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+
+            // Function to update visualizations based on selected year
+            function updateVisualizations(selectedYear) {
+                // Filter data based on selected year
+                var filteredData = data.filter(d => {
+                    var year = new Date(d.fire_start_date).getFullYear();
+                    return year.toString() === selectedYear;
+                });
+
+                // Create scatter plot for wind speed against wind direction colored by month
+                var windDirectionVsSpeedData = [{
+                    x: filteredData.map(d => d.wind_direction),
+                    y: filteredData.map(d => d.wind_speed),
+                    mode: 'markers',
+                    type: 'scatter',
+                    marker: {
+                        color: filteredData.map(d => {
+                            // Extract month from fire_start_date and assign random color based on month
+                            var month = new Date(d.fire_start_date).getMonth();
+                            return getRandomColor();
+                        }),
+                        size: 8,
+                        opacity: 0.7
+                    },
+                    // Add hover information
+                    hoverinfo: 'x+y+text',
+                    // Add text to display on hover
+                    text: filteredData.map(d => `Wind Direction: ${d.wind_direction}, Wind Speed: ${d.wind_speed}, General Cause: ${d.general_cause_desc}`),
+                }];
+
+                // Define layout options for the scatter plot
+                var layout = {
+                    hovermode: 'closest', // Show hover information for the closest point
+                    // Add other layout options as needed
+                };
+
+                // Plot the scatter plot with layout options
+                Plotly.newPlot('wind-direction-vs-speed', windDirectionVsSpeedData, layout);
+
+                // Calculate total occurrences for the selected year
+                var totalOccurrences = filteredData.length;
+
+                // Calculate percentage distribution of each general cause for the selected year
+                var generalCauseDistribution = d3.rollups(filteredData, 
+                    v => Math.round((v.length / totalOccurrences) * 100), 
+                    d => d.general_cause_desc
+                );
+
+                // Prepare data for pie chart
+                var pieChartData = [{
+                    values: generalCauseDistribution.map(d => d[1]),
+                    labels: generalCauseDistribution.map(d => d[0]),
+                    type: 'pie',
+                    textinfo: 'percent',
+                    textposition: 'inside',
+                    hoverinfo: 'label+percent'
+                }];
+
+                // Plot the pie chart for general causes
+                Plotly.newPlot('industry-pie-chart', pieChartData);
+
+                // Event listener for pie chart slice click
+                document.getElementById('industry-pie-chart').on('plotly_click', function(data) {
+                    var selectedGeneralCause = data.points[0].label;
+                    var filteredActivityData = filteredData.filter(d => d.general_cause_desc === selectedGeneralCause);
+
+                    // Calculate total occurrences of activity_class within the selected general cause
+                    var totalOccurrencesActivity = filteredActivityData.length;
+
+                    // Calculate percentage distribution of each activity_class within the selected general cause
+                    var activityClassDistribution = d3.rollups(filteredActivityData, 
+                        v => Math.round((v.length / totalOccurrencesActivity) * 100), 
+                        d => d.activity_class
+                    );
+
+                    // Prepare data for the second pie chart
+                    var activityPieChartData = [{
+                        values: activityClassDistribution.map(d => d[1]),
+                        labels: activityClassDistribution.map(d => d[0]),
+                        type: 'pie',
+                        textinfo: 'percent',
+                        textposition: 'inside',
+                        hoverinfo: 'label+percent'
+                    }];
+
+                    // Plot the second pie chart for activity classes within the selected general cause
+                    Plotly.newPlot('activity-class-pie-chart', activityPieChartData);
+
+                    // Event listener for activity class pie chart slice click
+                    document.getElementById('activity-class-pie-chart').on('plotly_click', function(data) {
+                        var selectedActivityClass = data.points[0].label;
+                        var filteredFireOriginData = filteredData.filter(d => d.activity_class === selectedActivityClass);
+
+                        // Calculate frequency of fire origins for each month
+                        var fireOriginDistribution = d3.rollups(filteredFireOriginData, 
+                            v => {
+                                var counts = Array(12).fill(0); // Initialize array for each month
+                                v.forEach(d => {
+                                    var month = new Date(d.fire_start_date).getMonth();
+                                    counts[month]++;
+                                });
+                                return counts;
+                            }, 
+                            d => d.fire_origin
+                        );
+
+                        // Prepare data for the bar chart
+                        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        var barChartData = fireOriginDistribution.map(d => {
+                            return {
+                                x: months,
+                                y: d[1],
+                                type: 'bar',
+                                name: d[0]
+                            };
+                        });
+
+                        // Plot the bar chart for fire origin distribution
+                        Plotly.newPlot('fire-origin-bar-chart', barChartData);
+
+                        // Populate fire origin dropdown
+                        var fireOrigins = Array.from(new Set(filteredFireOriginData.map(d => d.fire_origin)));
+                        var fireOriginDropdown = d3.select("#fire-origin-select");
+                        fireOriginDropdown.selectAll("option").remove(); // Clear existing options
+                        fireOriginDropdown.selectAll("option")
+                            .data(fireOrigins)
+                            .enter().append("option")
+                            .text(d => d)
+                            .attr("value", d => d);
+                            
+                        // Update line chart based on default selected fire origin
+                        updateLineChart();
+                    });
+                });
+            }
+
+            // Event listener for dropdown change
+            dropdown.on("change", function() {
+                var selectedYear = this.value;
+                updateVisualizations(selectedYear);
+            });
+        });
+
+        // Function to update line chart based on selected fire origin
+        function updateLineChart() {
+            var selectedFireOrigin = document.getElementById("fire-origin-select").value;
+            var filteredFireOriginData = data.filter(d => d.fire_origin === selectedFireOrigin);
+
+            // Extract data for humidity, temperature, and wind speed
+            var humidityData = filteredFireOriginData.map(d => ({
+                x: new Date(d.fire_start_date),
+                y: +d.humidity
+            }));
+
+            var temperatureData = filteredFireOriginData.map(d => ({
+                x: new Date(d.fire_start_date),
+                y: +d.temperature
+            }));
+
+            var windSpeedData = filteredFireOriginData.map(d => ({
+                x: new Date(d.fire_start_date),
+                y: +d.wind_speed
+            }));
+
+            // Create traces for line chart
+            var humidityTrace = {
+                x: humidityData.map(d => d.x),
+                y: humidityData.map(d => d.y),
+                mode: 'lines',
+                name: 'Humidity'
+            };
+
+            var temperatureTrace = {
+                x: temperatureData.map(d => d.x),
+                y: temperatureData.map(d => d.y),
+                mode: 'lines',
+                name: 'Temperature'
+            };
+
+            var windSpeedTrace = {
+                x: windSpeedData.map(d => d.x),
+                y: windSpeedData.map(d => d.y),
+                mode: 'lines',
+                name: 'Wind Speed'
+            };
+
+            // Plot the line chart
+            var layout = {
+                title: 'Weather Conditions Over Time',
+                xaxis: {
+                    title: 'Date'
+                },
+                yaxis: {
+                    title: 'Value'
+                }
+            };
+
+            Plotly.newPlot('line-chart', [humidityTrace, temperatureTrace, windSpeedTrace], layout);
+        }
+    </script>
+</body>
+</html>
