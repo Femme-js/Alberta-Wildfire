@@ -9,13 +9,13 @@ import json
 import numpy as np
 
 # Setup Flask app
-app = Flask(__name__, template_folder='/content/template')
+app = Flask(__name__, template_folder='/template')
 
 #Open Data files
-with open('./AB-Wildfires/Data/alberta_788.geojson', 'r') as f:
+with open('./Data/alberta_788.geojson', 'r') as f:
   boundaries = f.read()
 
-with open('./AB-Wildfires/Data/fp-historical-wildfire-data-2006-2021(2)(1).csv', 'r') as f2:
+with open('./Data/fp-historical-wildfire-data-2006-2021(2)(1).csv', 'r') as f2:
   historical_fire = f2.read()
 
 df = pd.read_csv("./AB-Wildfires/Data/fp-historical-wildfire-data-2006-2021(2)(1).csv")
